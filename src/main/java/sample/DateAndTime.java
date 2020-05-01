@@ -130,6 +130,24 @@ public class DateAndTime {
         return ResponseEntity.status(401).body(list);
     }
 
+    @GetMapping(value = "/users/{userLogin}?token={token}")
+    public ResponseEntity<String> getLoggedUser(@PathVariable String userLogin, String token){
+        JSONObject res = new JSONObject();
+
+        if (token != null){
+            for (User user : userList) {
+                if (user.getLogin().equals(userLogin) && user.getToken().equals(token)) {
+                    res.put("firstName", user.getFirstName());
+                    res.put("lastName", user.getLastName());
+                    res.put("login", user.getLogin());
+                    return ResponseEntity.status(200).body(res.toString());
+                }
+            }
+        }
+        res.put("error", "token not defined");
+        return ResponseEntity.status(401).body(res.toString());
+    }
+
     private boolean findToken(String token) {
         for(User user : userList){
             if(user.getToken().equals(token))
