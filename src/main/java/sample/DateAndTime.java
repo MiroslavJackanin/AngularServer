@@ -2,6 +2,8 @@ package sample;
 
 import com.google.gson.Gson;
 import net.minidev.json.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ public class DateAndTime {
 
     List<User> userList = new ArrayList<>();
     List<String> logList = new ArrayList<>();
+    List<String> messages = new ArrayList<>();
 
     public DateAndTime(){
         userList.add(new User("Roman", "Maly", "Romaly", "hesllo"));
@@ -242,7 +245,7 @@ public class DateAndTime {
                 }
             }
         }
-        res.put("error", "missing body attribtes");
+        res.put("error", "missing body attributes");
         return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
@@ -269,7 +272,59 @@ public class DateAndTime {
                 userLog.add(log);
             }
         }
-        return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(logObj.toString());
+        return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(userLog.toString());
+    }
+
+    @RequestMapping(method = RequestMethod.POST, value = "/message/new")
+    public ResponseEntity<String> newMessage(@RequestBody String data, @RequestHeader(name = "Authorization") String token){
+        org.json.JSONObject jsonObject = new org.json.JSONObject(data);
+        JSONObject res = new JSONObject();
+
+        String login = jsonObject.getString("from");
+
+        if (login == null  || !findToken(token) ) {
+            res.put("error", "invalid token or login");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+
+        if (findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to")) && jsonObject.has("message")) {
+            res.put("from", jsonObject.getString("from"));   // sender
+            res.put("message", jsonObject.getString("message"));   // message
+            res.put("to", jsonObject.getString("to"));   // acceptor
+
+            JSONArray jsonArray = new JSONArray();
+            jsonArray.put(res);
+
+            messages.add(res.toString());
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        } else {
+            res.put("error", "wrong input data");
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+    }
+
+    @RequestMapping(method = RequestMethod.GET, value = "/messages")
+    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token) throws JSONException {
+
+        org.json.JSONObject jsonObject = new org.json.JSONObject(data);
+        JSONObject res = new JSONObject();
+
+        String login = jsonObject.getString("login");
+        if (login == null  || !findToken(token) ) {
+            res.put("error", "invalid token or login");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+
+        if (jsonObject.has("login") && findLogin(jsonObject.getString("login"))) {
+            res.put("from", jsonObject.getString("login"));
+            for(int i = 0; i < messages.size(); i++) {
+                res.put("message" + i, messages.get(i));
+            }
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        } else {
+            res.put("error", "missing or wrong login");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
     }
 
     private boolean findToken(String token) {
