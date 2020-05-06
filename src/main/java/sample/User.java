@@ -1,8 +1,8 @@
 package sample;
 
 public class User {
-    private final String firstName;
-    private final String lastName;
+    private String firstName;
+    private String lastName;
     private final String login;
     private String password;
     private String token;
@@ -30,6 +30,12 @@ public class User {
         return token;
     }
 
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
     public void setPassword(String password) {
         this.password = password;
     }

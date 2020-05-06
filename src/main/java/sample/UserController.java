@@ -9,26 +9,25 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Random;
 
 @RestController
-public class DateAndTime {
+public class UserController {
 
     List<User> userList = new ArrayList<>();
     List<String> logList = new ArrayList<>();
     List<String> messages = new ArrayList<>();
 
-    public DateAndTime(){
-        userList.add(new User("Roman", "Maly", "Romaly", "hesllo"));
+    public UserController(){
+        userList.add(new User("User", "Name", "UsName", "pass"));
     }
 
     @RequestMapping("/time")
     public ResponseEntity<String> getTime(@RequestParam(value="token") String token) {
-
         if(token==null){
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\",\"Bad request\"}");
         }
@@ -43,55 +42,6 @@ public class DateAndTime {
         else return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Invalid token\"}");
     }
 
-    @RequestMapping("/time/hour")
-    public ResponseEntity<String> getHour(){
-        SimpleDateFormat sdfDate = new SimpleDateFormat("HH");
-        Date now = new Date();
-        String strHour = sdfDate.format(now);
-        return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("{\"hour\":"+strHour+"}");
-    }
-
-    @RequestMapping("/primenumber/{number}")
-    public ResponseEntity<String> checkPrimeNumber(@PathVariable String number) {
-        try {
-            int value = Integer.parseInt(number);
-            boolean isPrimeNumber=true;
-            if(value>1) {
-
-                for (int j = 2; j <= Math.sqrt(value); j++)
-                    if (value % j == 0) {
-                        isPrimeNumber = false;
-                        break;
-                    }
-            }
-            else
-                isPrimeNumber=false;
-
-            JSONObject res = new JSONObject();
-            res.put("number",value);
-            res.put("primenumber",isPrimeNumber);
-
-            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
-        }catch(NumberFormatException e) {
-            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Param must be integer\"}");
-        }
-    }
-
-    @RequestMapping("/hello")
-    public String getHello(){
-        return "Hello, How are you ?";
-    }
-
-    @RequestMapping("/hello/{name}")
-    public String getHelloWithName(@PathVariable String name){
-        return "Hello "+name+". How are you? ";
-    }
-
-    @RequestMapping("/hi")
-    public String getHi(@RequestParam(value="name") String name, @RequestParam(value="age") String age){
-        return "Hello. How are you? Your name is "+name+" and you are "+age;
-    }
-
     @PostMapping(value="/login")
     public ResponseEntity<String> login(@RequestBody String data){
         System.out.println(data);
@@ -104,7 +54,14 @@ public class DateAndTime {
                 res.put("error", "wrong password or login");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
-            String token = Long.toString(Math.abs(new SecureRandom().nextLong()), 16);
+            String token = generateToken();
+            for (User user : userList) {
+                if (user.getLogin().equals(tempUser.getLogin())) {
+                    user.setToken(token);
+                    break;
+                }
+            }
+
             res.put("firstName", tempUser.getFirstName());
             res.put("lastName", tempUser.getLastName());
             res.put("login", tempUser.getLogin());
@@ -112,14 +69,6 @@ public class DateAndTime {
         }
         logLogin(tempUser);
         return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
-    }
-
-    private void logLogin(User tempUser) {
-        JSONObject log = new JSONObject();
-        log.put("type", "login");
-        log.put("login", tempUser.getLogin());
-        log.put("datetime", getTime(tempUser.getToken()));
-        logList.add(log.toString());
     }
 
     @PostMapping(value="/logout")
@@ -144,14 +93,6 @@ public class DateAndTime {
         return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
-    private void logLogout(User user) {
-        JSONObject log = new JSONObject();
-        log.put("type", "logout");
-        log.put("login", user.getLogin());
-        log.put("datetime", getTime(user.getToken()));
-        logList.add(log.toString());
-    }
-
     @PostMapping(value="/signup")
     public ResponseEntity<String> signUp(@RequestBody String data){
         System.out.println(data);
@@ -168,7 +109,7 @@ public class DateAndTime {
                 res.put("error","password is a mandatory field");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
-            String passwordHash = BCrypt.hashpw(tempUser.getPassword(), BCrypt.gensalt());
+            String passwordHash = hash(tempUser.getPassword());
             User user = new User(tempUser.getFirstName(), tempUser.getLastName(), tempUser.getLogin(), passwordHash);
             userList.add(user);
 
@@ -223,7 +164,6 @@ public class DateAndTime {
 
     @PostMapping(value = "/changepassword")
     public ResponseEntity<String> changePassword(@RequestBody String data, @RequestHeader String token){
-        Gson gson = new Gson();
         org.json.JSONObject user = new org.json.JSONObject(data);
         JSONObject res = new JSONObject();
 
@@ -239,7 +179,8 @@ public class DateAndTime {
 
             for (User users : userList) {
                 if (users.getLogin().equals(user.getString("login"))) {
-                    users.setPassword(user.getString("newpassword"));
+                    String passHash = hash(user.getString("newpassword"));
+                    users.setPassword(passHash);
                     res.put(users.getLogin(), "password changed");
                     return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
                 }
@@ -249,8 +190,8 @@ public class DateAndTime {
         return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
-    @GetMapping(value = "/log")
-    public ResponseEntity<String> getLogList(@RequestHeader String token){
+    @GetMapping(value = "/log?type={logType}")
+    public ResponseEntity<String> getLogList(@RequestHeader String token, @PathVariable String logType){
         JSONObject res = new JSONObject();
         List<String> userLog = new ArrayList<>();
         if (!findToken(token)){
@@ -268,14 +209,14 @@ public class DateAndTime {
         org.json.JSONObject logObj = null;
         for (String log:logList) {
             logObj = new org.json.JSONObject(log);
-            if (logObj.getString("login").equals(login)){
+            if (logObj.getString("login").equals(login) && logObj.getString("type").equals(logType)){
                 userLog.add(log);
             }
         }
         return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(userLog.toString());
     }
 
-    @RequestMapping(method = RequestMethod.POST, value = "/message/new")
+    @PostMapping(value = "/message/new")
     public ResponseEntity<String> newMessage(@RequestBody String data, @RequestHeader(name = "Authorization") String token){
         org.json.JSONObject jsonObject = new org.json.JSONObject(data);
         JSONObject res = new JSONObject();
@@ -288,9 +229,9 @@ public class DateAndTime {
         }
 
         if (findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to")) && jsonObject.has("message")) {
-            res.put("from", jsonObject.getString("from"));   // sender
-            res.put("message", jsonObject.getString("message"));   // message
-            res.put("to", jsonObject.getString("to"));   // acceptor
+            res.put("from", jsonObject.getString("from"));
+            res.put("message", jsonObject.getString("message"));
+            res.put("to", jsonObject.getString("to"));
 
             JSONArray jsonArray = new JSONArray();
             jsonArray.put(res);
@@ -303,8 +244,8 @@ public class DateAndTime {
         }
     }
 
-    @RequestMapping(method = RequestMethod.GET, value = "/messages")
-    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token) throws JSONException {
+    @GetMapping(value = "/messages?from={fromLogin}")
+    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token, @PathVariable String fromLogin) throws JSONException {
 
         org.json.JSONObject jsonObject = new org.json.JSONObject(data);
         JSONObject res = new JSONObject();
@@ -315,16 +256,87 @@ public class DateAndTime {
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
 
+        org.json.JSONObject message;
         if (jsonObject.has("login") && findLogin(jsonObject.getString("login"))) {
             res.put("from", jsonObject.getString("login"));
             for(int i = 0; i < messages.size(); i++) {
-                res.put("message" + i, messages.get(i));
+                message = new org.json.JSONObject(messages.get(i));
+                if (message.getString("from").equals(fromLogin) && !fromLogin.equals("")){
+                    res.put("message" + i, messages.get(i));
+                }
             }
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         } else {
             res.put("error", "missing or wrong login");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
+    }
+
+    @DeleteMapping(value = "/delete/{login}")
+    public ResponseEntity<String> deleteUser(@RequestHeader(name = "Authorisation") String token, @PathVariable String login){
+        JSONObject res = new JSONObject();
+        if (matchToken(login, token)){
+            org.json.JSONObject jsonObject;
+            for (int i=0; i<messages.size(); i++){
+                jsonObject = new org.json.JSONObject(messages.get(i));
+                if (jsonObject.getString("from").equals(login)){
+                    messages.remove(messages.get(i));
+                }
+            }
+            for (int i=0; i<userList.size();i++){
+                if (userList.get(i).getLogin().equals(login)){
+                    userList.remove(userList.get(i));
+                }
+            }
+            res.put("status", "user removed");
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }else {
+            res.put("error", "wrong login or token");
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+    }
+
+    @PatchMapping(value = "update/{login}")
+    public ResponseEntity<String> updateLogin(@RequestBody String data, @RequestHeader String token, @PathVariable String login){
+        org.json.JSONObject jsonObject = new org.json.JSONObject(data);
+        JSONObject res = new JSONObject();
+
+        if (!matchToken(login, token)){
+            res.put("error", "wrong token or login");
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+
+        if (jsonObject.has("firstName"))
+            for (User user : userList)
+                if (user.getLogin().equals(login))
+                    user.setFirstName(jsonObject.getString("firstName"));
+        if (jsonObject.has("lastName"))
+            for (User user: userList)
+                if (user.getLogin().equals(login))
+                    user.setLastName(jsonObject.getString("lastName"));
+
+        res.put("status", "data changed");
+        return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+    }
+
+    private String generateToken(){
+        int size=25;
+        Random rnd = new Random();
+        StringBuilder generatedString= new StringBuilder();
+        for(int i = 0;i<size;i++) {
+            int type=rnd.nextInt(4);
+            switch (type) {
+                case 0:
+                    generatedString.append((char) ((rnd.nextInt(26)) + 65));
+                    break;
+                case 1:
+                    generatedString.append((char) ((rnd.nextInt(10)) + 48));
+                    break;
+                default:
+                    generatedString.append((char) ((rnd.nextInt(26)) + 97));
+            }
+        }
+        return generatedString.toString();
     }
 
     private boolean findToken(String token) {
@@ -359,5 +371,25 @@ public class DateAndTime {
             }
         }
         return false;
+    }
+
+    public String hash(String password) {
+        return BCrypt.hashpw(password, BCrypt.gensalt(12));
+    }
+
+    private void logLogout(User user) {
+        JSONObject log = new JSONObject();
+        log.put("type", "logout");
+        log.put("login", user.getLogin());
+        log.put("datetime", getTime(user.getToken()));
+        logList.add(log.toString());
+    }
+
+    private void logLogin(User tempUser) {
+        JSONObject log = new JSONObject();
+        log.put("type", "login");
+        log.put("login", tempUser.getLogin());
+        log.put("datetime", getTime(tempUser.getToken()));
+        logList.add(log.toString());
     }
 }
