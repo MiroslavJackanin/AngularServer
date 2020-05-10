@@ -2,8 +2,6 @@ package sample;
 
 import com.google.gson.Gson;
 import net.minidev.json.JSONObject;
-import org.json.JSONArray;
-import org.json.JSONException;
 import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -50,20 +48,19 @@ public class UserController {
         JSONObject res = new JSONObject();
 
         if (tempUser.getLogin()!=null && tempUser.getPassword()!=null){
-            if (matchLogin(tempUser.getLogin(), tempUser.getPassword())){
+            if (!matchLogin(tempUser.getLogin(), tempUser.getPassword())){
+                System.out.println(tempUser.getLogin());
+                System.out.println(tempUser.getPassword());
                 res.put("error", "wrong password or login");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
             String token = generateToken();
-            for (User user : userList) {
-                if (user.getLogin().equals(tempUser.getLogin())) {
-                    user.setToken(token);
-                    break;
-                }
-            }
+            Database db = new Database();
+            db.login(tempUser.getLogin(), token);
 
-            res.put("firstName", tempUser.getFirstName());
-            res.put("lastName", tempUser.getLastName());
+            org.json.JSONObject user = db.getUser(tempUser.getLogin());
+            res.put("firstName", user.getString("firstName"));
+            res.put("lastName", user.getString("lastName"));
             res.put("login", tempUser.getLogin());
             res.put("token", token);
         }
@@ -80,9 +77,8 @@ public class UserController {
         System.out.println(user.getLogin());
 
         if (findToken(token)){
-            for(User users : userList)
-                if(users.getLogin().equals(user.getLogin()))
-                    users.setToken(null);
+            Database db = new Database();
+            db.logout(user.getLogin(), token);
 
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("{}");
         }
@@ -112,6 +108,14 @@ public class UserController {
             String passwordHash = hash(tempUser.getPassword());
             User user = new User(tempUser.getFirstName(), tempUser.getLastName(), tempUser.getLogin(), passwordHash);
             userList.add(user);
+
+            org.json.JSONObject dbUser = new org.json.JSONObject();
+            dbUser.put("firstName", tempUser.getFirstName());
+            dbUser.put("lastName", tempUser.getLastName());
+            dbUser.put("login", tempUser.getLogin());
+            dbUser.put("password", passwordHash);
+            Database db = new Database();
+            db.insertUser(dbUser);
 
             res.put("firstName",tempUser.getFirstName());
             res.put("lastName",tempUser.getLastName());
@@ -232,11 +236,16 @@ public class UserController {
             res.put("from", jsonObject.getString("from"));
             res.put("message", jsonObject.getString("message"));
             res.put("to", jsonObject.getString("to"));
-
-            JSONArray jsonArray = new JSONArray();
-            jsonArray.put(res);
-
             messages.add(res.toString());
+
+            org.json.JSONObject dbMessage = new org.json.JSONObject();
+            dbMessage.put("from", jsonObject.getString("from"));
+            dbMessage.put("message", jsonObject.getString("message"));
+            dbMessage.put("to", jsonObject.getString("to"));
+
+            Database db = new Database();
+            db.insertMessage(dbMessage);
+
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         } else {
             res.put("error", "wrong input data");
@@ -245,7 +254,7 @@ public class UserController {
     }
 
     @GetMapping(value = "/messages?from={fromLogin}")
-    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token, @PathVariable String fromLogin) throws JSONException {
+    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token, @PathVariable String fromLogin){
 
         org.json.JSONObject jsonObject = new org.json.JSONObject(data);
         JSONObject res = new JSONObject();
@@ -288,6 +297,10 @@ public class UserController {
                     userList.remove(userList.get(i));
                 }
             }
+
+            Database db = new Database();
+            db.deleteUser(login);
+
             res.put("status", "user removed");
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }else {
@@ -306,14 +319,26 @@ public class UserController {
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
 
-        if (jsonObject.has("firstName"))
-            for (User user : userList)
+        if (jsonObject.has("firstName")) {
+            String name = "";
+            for (User user : userList) {
                 if (user.getLogin().equals(login))
+                    name = user.getFirstName();
                     user.setFirstName(jsonObject.getString("firstName"));
-        if (jsonObject.has("lastName"))
-            for (User user: userList)
+            }
+            Database db = new Database();
+            db.updateFName(name, jsonObject.getString("firstName"));
+        }
+        if (jsonObject.has("lastName")) {
+            String name = "";
+            for (User user : userList) {
                 if (user.getLogin().equals(login))
+                    name = user.getLastName();
                     user.setLastName(jsonObject.getString("lastName"));
+            }
+            Database db = new Database();
+            db.updateLName(name, jsonObject.getString("lastName"));
+        }
 
         res.put("status", "data changed");
         return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
@@ -340,20 +365,13 @@ public class UserController {
     }
 
     private boolean findToken(String token) {
-        for(User user : userList){
-            if(user.getToken().equals(token) && user.getToken()!=null)
-                return true;
-        }
-        return false;
+        Database db = new Database();
+        return (db.findToken(token));
     }
 
     private boolean matchLogin(String login, String password) {
-        for (User user : userList) {
-            if (user.getLogin().equals(login) && user.getPassword().equals(password)) {
-                return false;
-            }
-        }
-        return true;
+        Database db = new Database();
+        return db.matchLogin(login, password);
     }
 
     private boolean findLogin(String login) {
@@ -378,18 +396,24 @@ public class UserController {
     }
 
     private void logLogout(User user) {
-        JSONObject log = new JSONObject();
+        org.json.JSONObject log = new org.json.JSONObject();
         log.put("type", "logout");
         log.put("login", user.getLogin());
         log.put("datetime", getTime(user.getToken()));
         logList.add(log.toString());
+
+        Database db = new Database();
+        db.logLogout(log);
     }
 
     private void logLogin(User tempUser) {
-        JSONObject log = new JSONObject();
+        org.json.JSONObject log = new org.json.JSONObject();
         log.put("type", "login");
         log.put("login", tempUser.getLogin());
-        log.put("datetime", getTime(tempUser.getToken()));
+        log.put("datetime", getTime(tempUser.getToken()).toString());
         logList.add(log.toString());
+
+        Database db = new Database();
+        db.logLogin(log);
     }
 }
