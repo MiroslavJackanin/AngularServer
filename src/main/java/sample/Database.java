@@ -10,6 +10,9 @@ import org.bson.conversions.Bson;
 import org.json.JSONObject;
 import org.mindrot.jbcrypt.BCrypt;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Database {
     MongoClient mongo = new MongoClient( "localhost" , 27017 );
     MongoDatabase database = mongo.getDatabase("myServer");
@@ -28,6 +31,7 @@ public class Database {
     }
 
     public void logLogout(JSONObject jsonObject){
+        System.out.println("here log logout");
         Document document = new Document();
         document.append("type", "logout");
         document.append("login", jsonObject.getString("login"));
@@ -36,6 +40,7 @@ public class Database {
     }
 
     public void logLogin(JSONObject jsonObject){
+        System.out.println("here log login");
         Document document = new Document();
         document.append("type", "login");
         document.append("login", jsonObject.getString("login"));
@@ -143,6 +148,94 @@ public class Database {
                 Document doc = cursor.next();
                 JSONObject object = new JSONObject(doc.toJson());
                 if (object.getString("token").equals(token)){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public List<JSONObject> getLoggedUsers() {
+        List<JSONObject> list = new ArrayList<>();
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.has("token")){
+                    list.add(object);
+                }
+            }
+        }
+        return list;
+    }
+
+    public JSONObject getLoggedUser(String userLogin) {
+        JSONObject user = new JSONObject();
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("login").equals(userLogin)){
+                    user = object;
+                }
+            }
+        }
+        return user;
+    }
+
+    public boolean matchToken(String login, String token) {
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("login").equals(login) && object.getString("token").equals(token)){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public void changePassword(String login, String passHash) {
+        Bson filter = new Document("login", login);
+        Bson newValue = new Document("password", passHash);
+        Bson updateOperationDocument = new Document("$set", newValue);
+        collectionUsers.updateOne(filter, updateOperationDocument);
+    }
+
+    public String getLogin(String token) {
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("token").equals(token)){
+                    return object.getString("login");
+                }
+            }
+        }
+        return null;
+    }
+
+    public List<String> getLogs(String login, String logType) {
+        List<String> userLog = new ArrayList<>();
+        try (MongoCursor<Document> cursor = collectionLogs.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("type").equals(logType) && object.getString("login").equals(login)){
+                    userLog.add(object.toString());
+                }
+            }
+        }
+        return userLog;
+    }
+
+    public boolean findLogin(String login) {
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("login").equals(login)){
                     return true;
                 }
             }

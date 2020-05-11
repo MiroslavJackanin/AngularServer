@@ -8,6 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -21,7 +23,7 @@ public class UserController {
     List<String> messages = new ArrayList<>();
 
     public UserController(){
-        userList.add(new User("User", "Name", "UsName", "pass"));
+        //userList.add(new User("User", "Name", "UsName", "pass"));
     }
 
     @RequestMapping("/time")
@@ -30,12 +32,12 @@ public class UserController {
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\",\"Bad request\"}");
         }
         if(findToken(token)){
-            JSONObject ris = new JSONObject();
+            JSONObject res = new JSONObject();
             SimpleDateFormat sdfDate = new SimpleDateFormat("HH:mm:ss");
             Date now = new Date();
             String strTime = sdfDate.format(now);
-            ris.put("time",strTime);
-            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(ris.toString());
+            res.put("time",strTime);
+            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
         else return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Invalid token\"}");
     }
@@ -80,12 +82,12 @@ public class UserController {
             Database db = new Database();
             db.logout(user.getLogin(), token);
 
+            logLogout(user);
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("{}");
         }
 
         JSONObject res = new JSONObject();
         res.put("error","Incorrect login or token");
-        logLogout(user);
         return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
@@ -129,45 +131,53 @@ public class UserController {
     }
 
     @GetMapping(value = "/users?token={token}")
-    public ResponseEntity<List<JSONObject>> getLoggedUsers(@PathVariable String token){
-        List<JSONObject> list = new ArrayList<>();
+    public ResponseEntity<List<org.json.JSONObject>> getLoggedUsers(@PathVariable(name = "token") String token){
+        List<org.json.JSONObject> list = new ArrayList<>();
 
         if (findToken(token)){
-            for (User user : userList) {
+            /*for (User user : userList) {
                 JSONObject res = new JSONObject();
                 res.put("firstName", user.getFirstName());
                 res.put("lastName", user.getLastName());
                 res.put("login", user.getLogin());
                 list.add(res);
-            }
+            }*/
+            Database db = new Database();
+            list=db.getLoggedUsers();
+            /*System.out.println("lsit");
+            for (org.json.JSONObject jsonObject : list) {
+                System.out.println(jsonObject.toString());
+            }*/
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(list);
         }
-        JSONObject res = new JSONObject();
+        org.json.JSONObject res = new org.json.JSONObject();
         res.put("error", "no users logged in");
         list.add(res);
         return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(list);
     }
 
-    @GetMapping(value = "/users/{userLogin}?token={token}")
-    public ResponseEntity<String> getLoggedUser(@PathVariable String userLogin, String token){
-        JSONObject res = new JSONObject();
+    @GetMapping(value = "/?user={userLogin}&?token={token}")
+    public ResponseEntity<String> getLoggedUser(@PathVariable(name = "userLogin") String userLogin, @PathVariable(name = "token") String token){
+        org.json.JSONObject res = new org.json.JSONObject();
 
-        if (token != null){
-            for (User user : userList) {
+        if (findToken(token)){
+            /*for (User user : userList) {
                 if (user.getLogin().equals(userLogin) && user.getToken().equals(token)) {
                     res.put("firstName", user.getFirstName());
                     res.put("lastName", user.getLastName());
                     res.put("login", user.getLogin());
-                    return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
                 }
-            }
+            }*/
+            Database db = new Database();
+            res = db.getLoggedUser(userLogin);
+            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
         res.put("error", "token not defined");
         return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
     @PostMapping(value = "/changepassword")
-    public ResponseEntity<String> changePassword(@RequestBody String data, @RequestHeader String token){
+    public ResponseEntity<String> changePassword(@RequestBody String data, @RequestHeader(name = "Authorisation") String token){
         org.json.JSONObject user = new org.json.JSONObject(data);
         JSONObject res = new JSONObject();
 
@@ -176,47 +186,34 @@ public class UserController {
                 res.put("error", "no login with such token");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
-            if (matchLogin(user.getString("login"), user.getString("oldpassword"))){
+            if (!matchLogin(user.getString("login"), user.getString("oldpassword"))){
                 res.put("error", "wrong password or login");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
+            String passHash = hash(user.getString("newpassword"));
 
-            for (User users : userList) {
-                if (users.getLogin().equals(user.getString("login"))) {
-                    String passHash = hash(user.getString("newpassword"));
-                    users.setPassword(passHash);
-                    res.put(users.getLogin(), "password changed");
-                    return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
-                }
-            }
+            Database db = new Database();
+            db.changePassword(user.getString("login"), passHash);
+            res.put(user.getString("login"), "password changed");
+            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
         res.put("error", "missing body attributes");
         return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
     @GetMapping(value = "/log?type={logType}")
-    public ResponseEntity<String> getLogList(@RequestHeader String token, @PathVariable String logType){
+    public ResponseEntity<String> getLogList(@RequestHeader(name = "Authorization") String token, @PathVariable(name = "logType") String logType){
         JSONObject res = new JSONObject();
-        List<String> userLog = new ArrayList<>();
+        List<String> userLog;
         if (!findToken(token)){
             res.put("error", "invalid token");
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
 
-        String login = "";
-        for(User user : userList){
-            if(user.getToken().equals(token) && user.getToken()!=null){
-                login = user.getLogin();
-            }
-        }
+        Database db = new Database();
+        String login = db.getLogin(token);
 
-        org.json.JSONObject logObj = null;
-        for (String log:logList) {
-            logObj = new org.json.JSONObject(log);
-            if (logObj.getString("login").equals(login) && logObj.getString("type").equals(logType)){
-                userLog.add(log);
-            }
-        }
+        userLog = db.getLogs(login, logType);
         return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(userLog.toString());
     }
 
@@ -231,7 +228,6 @@ public class UserController {
             res.put("error", "invalid token or login");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
-
         if (findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to")) && jsonObject.has("message")) {
             res.put("from", jsonObject.getString("from"));
             res.put("message", jsonObject.getString("message"));
@@ -375,20 +371,13 @@ public class UserController {
     }
 
     private boolean findLogin(String login) {
-        for(User user : userList){
-            if(user.getLogin().equals(login))
-                return true;
-        }
-        return false;
+        Database db = new Database();
+        return (db.findLogin(login));
     }
 
     private boolean matchToken(String login, String token){
-        for (User user : userList) {
-            if (user.getLogin().equals(login) && user.getToken().equals(token)) {
-                return true;
-            }
-        }
-        return false;
+        Database db = new Database();
+        return db.matchToken(login, token);
     }
 
     public String hash(String password) {
@@ -399,7 +388,7 @@ public class UserController {
         org.json.JSONObject log = new org.json.JSONObject();
         log.put("type", "logout");
         log.put("login", user.getLogin());
-        log.put("datetime", getTime(user.getToken()));
+        log.put("datetime", getTime());
         logList.add(log.toString());
 
         Database db = new Database();
@@ -410,10 +399,17 @@ public class UserController {
         org.json.JSONObject log = new org.json.JSONObject();
         log.put("type", "login");
         log.put("login", tempUser.getLogin());
-        log.put("datetime", getTime(tempUser.getToken()).toString());
+        log.put("datetime", getTime());
         logList.add(log.toString());
 
         Database db = new Database();
         db.logLogin(log);
+    }
+
+    private String getTime() {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("ddMMyy HH:mm:ss");
+        LocalDateTime localTime = LocalDateTime.now();
+        return dtf.format(localTime);
+
     }
 }
