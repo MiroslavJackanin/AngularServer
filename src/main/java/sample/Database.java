@@ -8,18 +8,40 @@ import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.mindrot.jbcrypt.BCrypt;
 
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Database {
-    MongoClient mongo = new MongoClient( "localhost" , 27017 );
-    MongoDatabase database = mongo.getDatabase("myServer");
+    private final JSONObject config = getConfig();
+    private final String host = config.getString("host");
+    private final int port = Integer.parseInt(config.getString("port"));
+    private final String dbName = config.getString("dbname");
+
+    MongoClient mongo = new MongoClient(host, port);
+    MongoDatabase database = mongo.getDatabase(dbName);
 
     MongoCollection<Document> collectionUsers = database.getCollection("users");
     MongoCollection<Document> collectionLogs = database.getCollection("log");
     MongoCollection<Document> collectionMessages = database.getCollection("messages");
+
+    public JSONObject getConfig(){
+        JSONObject config = new JSONObject();
+        JSONParser parser = new JSONParser();
+        try {
+            org.json.simple.JSONObject obj = (org.json.simple.JSONObject) parser.parse(new FileReader("src/main/java/sample/configuration"));
+
+            config.put("url", obj.get("url"));
+            config.put("port", obj.get("port"));
+            config.put("dbname", obj.get("dbname"));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return config;
+    }
 
     public void insertUser(JSONObject jsonObject){
         Document document = new Document();
