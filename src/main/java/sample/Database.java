@@ -17,8 +17,8 @@ import java.util.List;
 
 public class Database {
     private final JSONObject config = getConfig();
-    private final String host = config.getString("host");
-    private final int port = Integer.parseInt(config.getString("port"));
+    private final String host = config.getString("url");
+    private final int port = Integer.parseInt(String.valueOf(config.getInt("port")));
     private final String dbName = config.getString("dbname");
 
     MongoClient mongo = new MongoClient(host, port);
@@ -53,7 +53,6 @@ public class Database {
     }
 
     public void logLogout(JSONObject jsonObject){
-        System.out.println("here log logout");
         Document document = new Document();
         document.append("type", "logout");
         document.append("login", jsonObject.getString("login"));
@@ -62,7 +61,6 @@ public class Database {
     }
 
     public void logLogin(JSONObject jsonObject){
-        System.out.println("here log login");
         Document document = new Document();
         document.append("type", "login");
         document.append("login", jsonObject.getString("login"));
@@ -169,8 +167,10 @@ public class Database {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 JSONObject object = new JSONObject(doc.toJson());
-                if (object.getString("token").equals(token)){
-                    return true;
+                if (object.has("token")) {
+                    if (object.getString("token").equals(token)) {
+                        return true;
+                    }
                 }
             }
         }
@@ -183,9 +183,10 @@ public class Database {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 JSONObject object = new JSONObject(doc.toJson());
-                if (object.has("token")){
+                /*if (object.has("token")){
                     list.add(object);
-                }
+                }*/
+                list.add(object);
             }
         }
         return list;
@@ -210,8 +211,10 @@ public class Database {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 JSONObject object = new JSONObject(doc.toJson());
-                if (object.getString("login").equals(login) && object.getString("token").equals(token)){
-                    return true;
+                if (object.has("token")) {
+                    if (object.getString("login").equals(login) && object.getString("token").equals(token)) {
+                        return true;
+                    }
                 }
             }
         }
@@ -230,8 +233,10 @@ public class Database {
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 JSONObject object = new JSONObject(doc.toJson());
-                if (object.getString("token").equals(token)){
-                    return object.getString("login");
+                if (object.has("token")) {
+                    if (object.getString("token").equals(token)) {
+                        return object.getString("login");
+                    }
                 }
             }
         }
@@ -263,5 +268,33 @@ public class Database {
             }
         }
         return false;
+    }
+
+    public List<String> getMessages(String login, String fromLogin) {
+        List<String> messages = new ArrayList<>();
+        try (MongoCursor<Document> cursor = collectionMessages.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if ((object.getString("to").equals(login) && object.getString("from").equals(fromLogin)) || (object.getString("from").equals(login) && object.getString("to").equals(fromLogin))){
+                    messages.add(object.toString());
+                }
+            }
+        }
+        return messages;
+    }
+
+    public List<String> getMessages(String login) {
+        List<String> messages = new ArrayList<>();
+        try (MongoCursor<Document> cursor = collectionMessages.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("to").equals(login)){
+                    messages.add(object.toString());
+                }
+            }
+        }
+        return messages;
     }
 }

@@ -27,7 +27,7 @@ public class UserController {
     }
 
     @RequestMapping("/time")
-    public ResponseEntity<String> getTime(@RequestParam(value="token") String token) {
+    public ResponseEntity<String> getTime(@RequestHeader(value="token") String token) {
         if(token==null){
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\",\"Bad request\"}");
         }
@@ -44,15 +44,12 @@ public class UserController {
 
     @PostMapping(value="/login")
     public ResponseEntity<String> login(@RequestBody String data){
-        System.out.println(data);
         Gson gson = new Gson();
         User tempUser = gson.fromJson(data, User.class);
         JSONObject res = new JSONObject();
 
         if (tempUser.getLogin()!=null && tempUser.getPassword()!=null){
             if (!matchLogin(tempUser.getLogin(), tempUser.getPassword())){
-                System.out.println(tempUser.getLogin());
-                System.out.println(tempUser.getPassword());
                 res.put("error", "wrong password or login");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
@@ -72,11 +69,8 @@ public class UserController {
 
     @PostMapping(value="/logout")
     public ResponseEntity<String> logout(@RequestBody String data, @RequestHeader(name = "Authorization") String token){
-        System.out.println(data);
-
         Gson gson = new Gson();
         User user = gson.fromJson(data, User.class);
-        System.out.println(user.getLogin());
 
         if (findToken(token)){
             Database db = new Database();
@@ -130,46 +124,31 @@ public class UserController {
         }
     }
 
-    @GetMapping(value = "/users?token={token}")
-    public ResponseEntity<List<org.json.JSONObject>> getLoggedUsers(@PathVariable(name = "token") String token){
-        List<org.json.JSONObject> list = new ArrayList<>();
+    @GetMapping(value = "/users")
+    public ResponseEntity<String> getLoggedUsers(@RequestHeader(name = "token") String token){
+        List<org.json.JSONObject> list;
+        org.json.JSONObject res = new org.json.JSONObject();
 
         if (findToken(token)){
-            /*for (User user : userList) {
-                JSONObject res = new JSONObject();
-                res.put("firstName", user.getFirstName());
-                res.put("lastName", user.getLastName());
-                res.put("login", user.getLogin());
-                list.add(res);
-            }*/
             Database db = new Database();
             list=db.getLoggedUsers();
-            /*System.out.println("lsit");
-            for (org.json.JSONObject jsonObject : list) {
-                System.out.println(jsonObject.toString());
-            }*/
-            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(list);
+            for (int i=0; i<list.size(); i++){
+                res.put(String.valueOf(i), list.get(i));
+            }
+            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
-        org.json.JSONObject res = new org.json.JSONObject();
         res.put("error", "no users logged in");
-        list.add(res);
-        return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(list);
+        return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
-    @GetMapping(value = "/?user={userLogin}&?token={token}")
-    public ResponseEntity<String> getLoggedUser(@PathVariable(name = "userLogin") String userLogin, @PathVariable(name = "token") String token){
+    @GetMapping(value = "/user")
+    public ResponseEntity<String> getLoggedUser(@RequestBody String data, @RequestHeader(name = "token") String token){
         org.json.JSONObject res = new org.json.JSONObject();
+        org.json.JSONObject dat = new org.json.JSONObject(data);
 
         if (findToken(token)){
-            /*for (User user : userList) {
-                if (user.getLogin().equals(userLogin) && user.getToken().equals(token)) {
-                    res.put("firstName", user.getFirstName());
-                    res.put("lastName", user.getLastName());
-                    res.put("login", user.getLogin());
-                }
-            }*/
             Database db = new Database();
-            res = db.getLoggedUser(userLogin);
+            res = db.getLoggedUser(dat.getString("login"));
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
         res.put("error", "token not defined");
@@ -201,8 +180,9 @@ public class UserController {
         return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
-    @GetMapping(value = "/log?type={logType}")
-    public ResponseEntity<String> getLogList(@RequestHeader(name = "Authorization") String token, @PathVariable(name = "logType") String logType){
+    @PostMapping(value = "/log")
+    public ResponseEntity<String> getLogList(@RequestHeader(name = "Authorization") String token, @RequestBody String data){
+        org.json.JSONObject jsonObject = new org.json.JSONObject(data);
         JSONObject res = new JSONObject();
         List<String> userLog;
         if (!findToken(token)){
@@ -213,7 +193,7 @@ public class UserController {
         Database db = new Database();
         String login = db.getLogin(token);
 
-        userLog = db.getLogs(login, logType);
+        userLog = db.getLogs(login, jsonObject.getString("type"));
         return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(userLog.toString());
     }
 
@@ -228,7 +208,7 @@ public class UserController {
             res.put("error", "invalid token or login");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
-        if (findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to")) && jsonObject.has("message")) {
+        if (matchToken(jsonObject.getString("from"), token) && findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to")) && jsonObject.has("message")) {
             res.put("from", jsonObject.getString("from"));
             res.put("message", jsonObject.getString("message"));
             res.put("to", jsonObject.getString("to"));
@@ -249,30 +229,41 @@ public class UserController {
         }
     }
 
-    @GetMapping(value = "/messages?from={fromLogin}")
-    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token, @PathVariable String fromLogin){
+    @PostMapping(value = "/messages")
+    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token){
 
         org.json.JSONObject jsonObject = new org.json.JSONObject(data);
         JSONObject res = new JSONObject();
 
-        String login = jsonObject.getString("login");
-        if (login == null  || !findToken(token) ) {
-            res.put("error", "invalid token or login");
+        String login;
+        String fromLogin = null;
+
+        if (jsonObject.has("login")){
+            if (findLogin(jsonObject.getString("login")) && findToken(token)) {
+                login = jsonObject.getString("login");
+            }else {
+                res.put("error", "login or token not found");
+                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+            }
+            if (jsonObject.has("from")){
+                fromLogin = jsonObject.getString("from");
+            }
+        }else {
+            res.put("error", "invalid input data");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
 
-        org.json.JSONObject message;
-        if (jsonObject.has("login") && findLogin(jsonObject.getString("login"))) {
-            res.put("from", jsonObject.getString("login"));
-            for(int i = 0; i < messages.size(); i++) {
-                message = new org.json.JSONObject(messages.get(i));
-                if (message.getString("from").equals(fromLogin) && !fromLogin.equals("")){
-                    res.put("message" + i, messages.get(i));
-                }
-            }
-            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
-        } else {
-            res.put("error", "missing or wrong login");
+        List<String> messages;
+        Database db = new Database();
+
+        if (fromLogin != null && matchToken(login, token)){
+            messages = db.getMessages(login, fromLogin);
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(messages.toString());
+        }else if (fromLogin == null){
+            messages = db.getMessages(login);
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(messages.toString());
+        }else {
+            res.put("error", "not authorised");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
     }
