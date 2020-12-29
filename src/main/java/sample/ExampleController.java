@@ -1,4 +1,4 @@
-package sample;
+/*package sample;
 
 import org.json.JSONObject;
 import org.springframework.http.MediaType;
@@ -49,4 +49,4 @@ public class ExampleController {
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Param must be integer\"}");
         }
     }
-}
+}*/
