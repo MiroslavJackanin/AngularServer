@@ -525,7 +525,7 @@ public class UserController {
     /// from
     // to
     // messages
-    @RequestMapping(method = RequestMethod.POST, value = "/message/new")
+    /*@RequestMapping(method = RequestMethod.POST, value = "/message/new")
     public ResponseEntity<String> sendMessage(@RequestBody String data, @RequestHeader(name = "Authorization") String token) throws JSONException {
 
 
@@ -580,10 +580,50 @@ public class UserController {
         }
 
 
+    }*/
+
+
+    @PostMapping(value = "/message/new")
+    public ResponseEntity<String> newMessage(@RequestBody String data, @RequestHeader(name = "Authorization") String token){
+        org.json.JSONObject jsonObject = new org.json.JSONObject(data);
+        JSONObject res = new JSONObject();
+
+        String login = jsonObject.getString("from");
+
+        if (login == null  || !findToken(token) ) {
+            res.put("error", "invalid token or login");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+        if (matchToken(jsonObject.getString("from"), token) && findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to")) && jsonObject.has("message")) {
+            res.put("from", jsonObject.getString("from"));
+            res.put("message", jsonObject.getString("message"));
+            res.put("to", jsonObject.getString("to"));
+            messages.add(res.toString());
+
+            org.json.JSONObject dbMessage = new org.json.JSONObject();
+            dbMessage.put("from", jsonObject.getString("from"));
+            dbMessage.put("message", jsonObject.getString("message"));
+            dbMessage.put("to", jsonObject.getString("to"));
+
+            Database db = new Database();
+            db.insertMyMessage(dbMessage);
+
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        } else {
+            res.put("error", "wrong input data");
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
     }
 
+    private boolean matchToken(String login, String token){
+        Database db = new Database();
+        return db.matchToken(login, token);
+    }
 
-
+    private boolean findLogin(String login) {
+        Database db = new Database();
+        return (db.findLogin(login));
+    }
 
 
 /////////////////////////////////////// GET MESSAGES
@@ -635,6 +675,45 @@ public class UserController {
 
     }
 
+    @PostMapping(value = "/messages")
+    public ResponseEntity<String> getMyMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token){
+
+        org.json.JSONObject jsonObject = new org.json.JSONObject(data);
+        JSONObject res = new JSONObject();
+
+        String login;
+        String fromLogin = null;
+
+        if (jsonObject.has("login")){
+            if (findLogin(jsonObject.getString("login")) && findToken(token)) {
+                login = jsonObject.getString("login");
+            }else {
+                res.put("error", "login or token not found");
+                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+            }
+            if (jsonObject.has("from")){
+                fromLogin = jsonObject.getString("from");
+            }
+        }else {
+            res.put("error", "invalid input data");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+
+        List<String> messages;
+        Database db = new Database();
+
+        if (fromLogin != null && matchToken(login, token)){
+            messages = db.getMessages(login, fromLogin);
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(messages.toString());
+        }else if (fromLogin == null){
+            messages = db.getMessages(login);
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(messages.toString());
+        }else {
+            res.put("error", "not authorised");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+    }
+
 
     //    @RequestMapping(method = RequestMethod.POST, value = "/playground")
     @RequestMapping( value = "/playground")
@@ -675,7 +754,7 @@ public class UserController {
 
     //////////////////////////////////////////////////////////////////
     // message only FROM ivana this message which send me sender
-    @RequestMapping( method = RequestMethod.POST,value = "/messages")  //localhost:8080/messages?from=ivana
+    /*@RequestMapping( method = RequestMethod.POST,value = "/messages")  //localhost:8080/messages?from=ivana
     public ResponseEntity<String> getMessage(@RequestBody String data , @RequestHeader(name = "Authorization") String token) throws JSONException {
 
         // System.out.println("message from  " + from + "  space  my login " + myLogin);
@@ -724,7 +803,7 @@ public class UserController {
 
         }
 
-    }
+    }*/
 
 
     /////////////////////// DELETE ACCOUNT   vytvorit DELETE request localhost:8080/delete/login
