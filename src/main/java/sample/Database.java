@@ -44,29 +44,14 @@ public class Database {
         System.out.println("=================================");
     }
 
-    public void insertMessage(JSONObject jsonObject) throws JSONException {
-
-        Document document = new Document()
-                .append("from", jsonObject.getString("from"))
-                .append("message", jsonObject.getString("message"))
-                .append("to", jsonObject.getString("to"))
-                .append("datetime", jsonObject.getString("datetime"));
-
-        collectionMessages.insertOne(document);
-
-        System.out.println("=================================");
-        System.out.println("INSERT into database okey ");
-        System.out.println("=================================");
-    }
-
-    public void insertMyMessage(JSONObject jsonObject){
+    public void insertMessage(JSONObject jsonObject){
         Document document = new Document();
         document.append("from", jsonObject.getString("from"));
         document.append("message", jsonObject.getString("message"));
         document.append("to", jsonObject.getString("to"));
+        document.append("time", jsonObject.getString("time"));
         collectionMessages.insertOne(document);
     }
-
 
     public boolean existLogin(String login) throws JSONException {
 
@@ -299,7 +284,6 @@ public class Database {
 
     }
 
-
     public void deleteUser(String login) throws JSONException {
         BasicDBObject theQuery = new BasicDBObject();
         theQuery.put("login", login);
@@ -318,10 +302,8 @@ public class Database {
         }
     }
 
-
-    public void updateuser(String fname, String lname, String login) {
+    public void updateUser(String fname, String lname, String login) {
         // crete new document
-
 
         System.out.println("string fname is " + fname + " lname is " + lname);
 
@@ -338,12 +320,6 @@ public class Database {
         Bson update=new Document("$set", newValue);
         collectionUsers.updateOne(updateQuery, update);*/
     }
-
-
-
-
-
-
 
     public boolean findToken(String token) {
         try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {

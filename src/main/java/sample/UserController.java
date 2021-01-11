@@ -382,7 +382,7 @@ public class UserController {
             dbMessage.put("time", time);
 
             Database db = new Database();
-            db.insertMyMessage(dbMessage);
+            db.insertMessage(dbMessage);
 
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         } else {
@@ -543,7 +543,7 @@ v Body bude udaje co chceme zmenit, a to moze byt len fname alebo lname (prip ob
                     // input parameter  fname lname
                     System.out.println("body data fname  " + bodyData.getString("fname") + "body data getString lname " + bodyData.getString("lname"));
 
-                    database.updateuser( bodyData.getString("fname") ,  bodyData.getString("lname"),bodyData.getString("login"));
+                    database.updateUser( bodyData.getString("fname") ,  bodyData.getString("lname"),bodyData.getString("login"));
                     database.closeDatabase();
 
                     //return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(result.toString());
