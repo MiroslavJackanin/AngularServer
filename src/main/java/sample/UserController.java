@@ -429,6 +429,53 @@ public class UserController {
         }
     }
 
+    @PostMapping(value = "/deleteMsg")
+    public ResponseEntity<String> deleteMessage(@RequestBody String data, @RequestHeader(name = "Authorization") String token){
+        org.json.JSONObject jsonObject = new org.json.JSONObject(data);
+        JSONObject res = new JSONObject();
+
+        String login;
+        String message;
+        String time;
+
+        if (jsonObject.has("login")){
+            if (findLogin(jsonObject.getString("login")) && findToken(token)) {
+                login = jsonObject.getString("login");
+            }else {
+                res.put("error", "login or token not found");
+                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+            }
+            if (jsonObject.has("msg")){
+                message = jsonObject.getString("msg");
+            } else {
+                res.put("error", "message not found");
+                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+            }
+            if (jsonObject.has("time")) {
+                time = jsonObject.getString("time");
+            } else {
+                res.put("error", "time not found");
+                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+            }
+        }else {
+            res.put("error", "invalid input data");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
+
+        Database db = new Database();
+
+        if (message != null && matchToken(login, token)){
+            if (db.deleteMessage(time, message, login)) {
+                res.put("message", "delete message successful");
+                return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+            }
+        }
+        res.put("message", "delete message unsuccessful");
+        return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+    }
+
+
+
     @RequestMapping( value = "/playground")
     public ResponseEntity<String> playground() throws JSONException {
         System.out.println("messages without fname ");
@@ -561,7 +608,9 @@ v Body bude udaje co chceme zmenit, a to moze byt len fname alebo lname (prip ob
         }
     }
 
-    public boolean checkPassword(String login, String password) throws JSONException {
+
+
+    private boolean checkPassword(String login, String password) throws JSONException {
         User user = getUser(login);
         if (user.getLogin() != null) {
             System.out.println("---                                             ----");
@@ -593,7 +642,7 @@ v Body bude udaje co chceme zmenit, a to moze byt len fname alebo lname (prip ob
     }
 
     private String getTime() {
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yy HH:mm");
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM HH:mm");
         LocalDateTime localTime = LocalDateTime.now();
         return dtf.format(localTime);
     }

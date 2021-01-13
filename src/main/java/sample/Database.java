@@ -5,6 +5,7 @@ import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.json.JSONArray;
@@ -18,9 +19,9 @@ public class Database {
     private MongoClient mongo = new MongoClient("localhost", 27017);
     private MongoDatabase database = mongo.getDatabase("javaServer");
 
-    private MongoCollection<Document> collectionUsers = database.getCollection("users");
-    private MongoCollection<Document> collectionLogs = database.getCollection("loginHistory");
-    private MongoCollection<Document> collectionMessages = database.getCollection("messages");
+    private final MongoCollection<Document> collectionUsers = database.getCollection("users");
+    private final MongoCollection<Document> collectionLogs = database.getCollection("loginHistory");
+    private final MongoCollection<Document> collectionMessages = database.getCollection("messages");
 
 
     public void closeDatabase() {
@@ -300,6 +301,29 @@ public class Database {
                 }
             }
         }
+    }
+
+    public boolean deleteMessage(String time, String message, String login) {
+        BasicDBObject theQuery;
+        System.out.println(time);
+        System.out.println(message);
+        System.out.println(login);
+
+        try (MongoCursor<Document> cursor = collectionMessages.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.has("time") && object.has("message") && object.has("from")) {
+                    if (object.getString("time").equals(time) && object.getString("message").equals(message) && object.getString("from").equals(login)){
+                        theQuery = new BasicDBObject();
+                        theQuery.put("message", message);
+                        collectionMessages.deleteOne(theQuery);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public void updateUser(String fname, String lname, String login) {
