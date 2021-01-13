@@ -168,8 +168,8 @@ public class Database {
         List<String> usersList = new ArrayList<>();
 
         for (Document document : collectionUsers.find()) {
-            JSONObject object = new JSONObject(document.toJson());  // document to json
-// how to push
+            JSONObject object = new JSONObject(document.toJson());
+
             usersList.add(object.getString("login"));
 
             userListJson.put("login", object.getString("login"));
@@ -177,16 +177,6 @@ public class Database {
         }
         return usersList;
     }
-
-       /* public List<String> getMessages() throws JSONException {
-            List<String> messagesList = new ArrayList<>();
-            for (Document document : collectionMessages.find()) {
-                JSONObject object = new JSONObject(document.toJson());  // document to json
-                messagesList.add(object.toString());
-            }
-            return messagesList;
-        }*/
-
 
     public void saveToken(String login, String token) {
         System.out.println("                                            save token into database ");
@@ -326,12 +316,6 @@ public class Database {
 
         Bson updateOperationDocument = new Document("$set", newValue);
         collectionUsers.updateMany(filter, updateOperationDocument);
-
-
-        /*   Bson updateQuery=new Document("login", login);
-        Bson newValue=new Document("password", hash);
-        Bson update=new Document("$set", newValue);
-        collectionUsers.updateOne(updateQuery, update);*/
     }
 
     public boolean findToken(String token) {
@@ -361,6 +345,19 @@ public class Database {
             }
         }
         return user;
+    }
+
+    public List<String> getLoggedUsers() {
+        List<String> users = new ArrayList<>();
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+
+                users.add(object.toString());
+            }
+        }
+        return users;
     }
 
     public boolean matchToken(String login, String token) {

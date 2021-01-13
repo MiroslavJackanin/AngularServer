@@ -123,13 +123,6 @@ public class UserController {
                 System.out.println("loggedUSer class name and lname " + loggedUser.getLname());
                 System.out.println("---                                         ----");
 
-/*
-                result.put("fname", loggedUser.getFname());
-                result.put("lname", loggedUser.getLname());
-                result.put("login", loggedUser.getLogin());
-*/
-
-
                 // put data into json object
                 logHistory.put("type", "login");
                 logHistory.put("login", loggedUser.getLogin());
@@ -251,16 +244,12 @@ public class UserController {
 
                     return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("{\"message\": \"Successfully changed password \"}");
                 }
-                resultJson.put("error", "Wrong password or token");
-                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(resultJson.toString());
-            } else {
-                resultJson.put("error", "Wrong password or token");
-                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(resultJson.toString());
             }
+            resultJson.put("error", "Wrong password or token");
         } else {
             resultJson.put("error", "Wrong input");
-            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(resultJson.toString());
         }
+        return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(resultJson.toString());
     }
 
     @RequestMapping(method = RequestMethod.POST, value = "/log")
@@ -326,7 +315,7 @@ public class UserController {
         return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
-    @RequestMapping("/users") //return all users
+    @RequestMapping("/users")
     public ResponseEntity<String> getUsers(@RequestHeader(name = "Authorization") String token, @RequestBody String data) throws JSONException {
         JSONObject inputData = new JSONObject(data);
         String From = inputData.getString("login");
@@ -336,13 +325,8 @@ public class UserController {
         if (inputData.getString("login") != null) {
             System.out.println("We have From " + From);
         }
-        //JSONObject obj = new JSONObject(data);
+
         User userObject = getUser(From);
-//
-//        if (user == null || !database.existToken(token,user.getLogin())) { // check we have user and check the token
-//            result.put("error", "Incorrect login or invalid TOKEN ");
-//            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(result.toString());
-//
         if (token == null) {
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Bad request 123\"}");
         }
@@ -353,6 +337,22 @@ public class UserController {
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(jsonUsers);
         } else
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Invalid token\"}");
+    }
+
+    @PostMapping(value = "/loggedUsers")
+    public ResponseEntity<String> getLoggedUsers(@RequestHeader(name = "Authorization") String token){
+        JSONObject res = new JSONObject();
+
+        if (findToken(token)) {
+            Database db = new Database();
+            List<String> users;
+
+            users = db.getLoggedUsers();
+            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(users.toString());
+        } else {
+            res.put("error", "token not found");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+        }
     }
 
     @PostMapping(value = "/message/new")
@@ -478,17 +478,9 @@ public class UserController {
     @RequestMapping(value = "/playground")
     public ResponseEntity<String> playground() throws JSONException {
         System.out.println("messages without fname ");
-        // JSONObject inputData = new JSONObject(data);
-        JSONObject ResultJson = new JSONObject();
-        // User userObject = getUser(inputData.getString("login"));
         Database database = new Database();
         List<String> messagesList = database.getAllMessages();
         database.closeDatabase();
-        //  put messages into json
-                /*for (int i = 0; i < messages.size(); i++) {
-                    ResultJson.put("message " + i, messages.get(i));
-                    System.out.print(messages.get(i));
-                }*/
         return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(messagesList.toString());
     }
 
@@ -507,7 +499,7 @@ public class UserController {
 
         User user = getUser(login);
 
-        if ( user == null ) {
+        if (user == null) {
             System.out.println("user is null");
 
             result.put("error", "Login does not exist in our database");
@@ -520,7 +512,7 @@ public class UserController {
 
         if (user.getFname() != null && database.existLogin(objectInput.getString("login"))) {
             if (database.existToken(token, user.getLogin())) {
-               // database.deleteToken(objectInput.getString("login"));
+                // database.deleteToken(objectInput.getString("login"));
 
                 //  user.setToken(null);
 
@@ -550,9 +542,6 @@ v Body bude udaje co chceme zmenit, a to moze byt len fname alebo lname (prip ob
 
     @RequestMapping(method = RequestMethod.PATCH, value = "/update") // here
     public ResponseEntity<String> updateLogin(@RequestBody String data, @RequestHeader(name = "Authorization") String token) throws JSONException {
-        // System.out.println("temp " + user);
-
-        //System.out.println("UPDATE/login " + login);
 
         JSONObject bodyData = new JSONObject(data);
         JSONObject result = new JSONObject();
