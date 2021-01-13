@@ -209,19 +209,6 @@ public class Database {
     }
 
 
-    // my function
-    /*public boolean existToken(String token ) throws JSONException {
-        Document found = collectionUsers.find(new Document("token", token)).first();
-        JSONObject user = new JSONObject(found);
-        if (found == null) {
-            return false;
-        } else {
-            System.out.println(user.getString("login"));
-            System.out.println(user.getString("token"));
-            return true;
-        }
-    }*/
-
     public boolean existToken(String token, String login) throws JSONException {
         try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
 
@@ -271,13 +258,15 @@ public class Database {
             if (object.getString("login").equals(login) &&
                     object.getString("token").equals(token)) {
 
+                System.out.println(object);
 
                 BasicDBObject deleteQuery = new BasicDBObject();
                 deleteQuery.put("login", login);
                 collectionUsers.deleteOne(deleteQuery);
-
+                System.out.println("user delete  ");
 
             } else {
+
                 System.out.println("nesplnena podmienka pre vymazanie ");
             }
         }
