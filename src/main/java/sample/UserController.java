@@ -486,7 +486,7 @@ public class UserController {
 
     /////////////////////// DELETE ACCOUNT   vytvorit DELETE request localhost:8080/delete/login
 // todo potrebne dokncit
-    @RequestMapping(method = RequestMethod.DELETE, value = "/deleteAccount")
+    @PostMapping(value = "/deleteAccount")
     public ResponseEntity<String> deleteAccount(@RequestBody String data, @RequestHeader(name = "Authorization") String token) throws JSONException {
 
         // input data RequestBody  login, password
@@ -524,10 +524,10 @@ public class UserController {
                     return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(result.toString());
                 }
 
-                result.put("error", "Incorrect login or token");
-                return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(result.toString());
+                result.put("error", "Incorrect password idiot try again");
+                return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(result.toString());
             }
-            result.put("error", "bad token");
+            result.put("error", "Bad token");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(result.toString());
 
         }
