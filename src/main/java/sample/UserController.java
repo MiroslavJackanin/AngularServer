@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.mindrot.jbcrypt.BCrypt;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -399,6 +401,9 @@ public class UserController {
         String login;
         String fromLogin = null;
 
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.add("Content-Type", "application/json; charset=UTF-8");
+
         if (jsonObject.has("login")) {
             if (findLogin(jsonObject.getString("login")) && findToken(token)) {
                 login = jsonObject.getString("login");
@@ -419,7 +424,7 @@ public class UserController {
 
         if (fromLogin != null && matchToken(login, token)) {
             messages = db.getMessages(login, fromLogin);
-            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(messages.toString());
+            return new ResponseEntity<>(messages.toString(), responseHeaders, HttpStatus.CREATED);
         } else if (fromLogin == null) {
             messages = db.getMessages(login);
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(messages.toString());
