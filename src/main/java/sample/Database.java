@@ -5,7 +5,6 @@ import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Filters;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.json.JSONArray;
@@ -30,7 +29,6 @@ public class Database {
     }
 
     public void insertUser(JSONObject jsonObject) throws JSONException {
-
         Document document = new Document()
                 .append("fname", jsonObject.getString("fname"))
                 .append("lname", jsonObject.getString("lname"))
@@ -39,10 +37,6 @@ public class Database {
                 .append("token", jsonObject.getString("token"));
 
         collectionUsers.insertOne(document);
-
-        System.out.println("=================================");
-        System.out.println("INSERT into database okey ");
-        System.out.println("=================================");
     }
 
     public void insertMessage(JSONObject jsonObject){
@@ -55,26 +49,8 @@ public class Database {
     }
 
     public boolean existLogin(String login) throws JSONException {
-
         Document found = collectionUsers.find(new Document("login", login)).first();
-
-        System.out.println("found is " + found);
-
-
-        JSONObject object = new JSONObject(found);
-
-        if (found == null) {
-            System.out.println("---------------------------");
-            System.out.println(" WE DONT HAVE VALUE");
-            System.out.println("---------------------------");
-            return false; //  dos not exist record
-        } else {
-            System.out.println("-----------------------");
-            System.out.println("get login from json  === " + object.getString("login") + " ===");
-            System.out.println("we HAVE VALUE IN OUR DATABASE ");
-            System.out.println("-----------------------");
-            return true;
-        }
+        return found != null;
     }
 
 
@@ -83,37 +59,14 @@ public class Database {
         JSONObject object = new JSONObject(found);
 
         if (found == null) {
-            System.out.println(" WE DONT HAVE VALUE");
-            return null; //  dos not exist record
+            return null;
         } else {
-            System.out.println("get login from json  === " + object.getString("login") + " ===");
-            System.out.println("we HAVE VALUE IN OUR DATABASE ");
             return object;
         }
-
-
     }
-/*
-    public JSONObject getLoginHistory(String login) throws JSONException {
-        Document found = collectionLogs.find(new Document("login", login)).first();
-        JSONObject loginObject = new JSONObject(found);
-        ArrayList<String> listdata = new ArrayList<>();
-        if (found == null) {
-            System.out.println(" WE DONT HAVE VALUE");
-            return null; //  dos not exist record
-        } else {
-            System.out.println("get login from json  === " + loginObject.getString("login") + " ===");
-            System.out.println("we HAVE VALUE IN OUR DATABASE ");
-            return loginObject;
-        }
-    }
-    */
-
 
     public List<String> getLoginHistory(String login) throws JSONException {
-
         List<String> loginHistory = new ArrayList<>();
-
         for (Document document : collectionLogs.find()) {
             JSONObject object = new JSONObject(document.toJson());  // document to json
             if (object.getString("login").equals(login)) {
@@ -123,42 +76,16 @@ public class Database {
         return loginHistory;
     }
 
-    // todo list this function you have to change only my messages no all message this is bad mistake
     public List<String> getAllMessages() throws JSONException {
 
         List<String> loginHistory = new ArrayList<>();
 
         for (Document document : collectionMessages.find()) {
             JSONObject object = new JSONObject(document.toJson());  // document to json
-
-
             loginHistory.add(object.toString());
-
         }
         return loginHistory;
     }
-
-
-    public List<String> getMessagesFromUser(String fromLogin, String myLogin) throws JSONException {
-
-        List<String> messagesList = new ArrayList<>();
-
-        for (Document document : collectionMessages.find()) {
-            JSONObject object = new JSONObject(document.toJson());  // document to json
-
-            // write conditions where login equals mylogin and from login also equals
-
-
-            if ((object.getString("from").equals(myLogin) && object.getString("to").equals(fromLogin)) ||
-                    (object.getString("from").equals(fromLogin) && object.getString("to").equals(myLogin))) {
-
-                messagesList.add(object.toString());
-            }
-
-        }
-        return messagesList;
-    }
-
 
     public List<String> getUsers() throws JSONException {
 
@@ -179,7 +106,6 @@ public class Database {
     }
 
     public void saveToken(String login, String token) {
-        System.out.println("                                            save token into database ");
         Bson updateQuery = new Document("login", login);
         Bson newValue = new Document("token", token);
         Bson update = new Document("$set", newValue);
@@ -193,24 +119,17 @@ public class Database {
                 .append("login", jsonObject.getString("login"))
                 .append("datetime", jsonObject.getString("datetime"));
 
-
         collectionLogs.insertOne(document);
-
     }
-
 
     public boolean existToken(String token, String login) throws JSONException {
         try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
-
-            System.out.println("input token " + token);
-            System.out.println("input login " + login);
 
             while (cursor.hasNext()) {
                 Document doc = cursor.next();
                 JSONObject object = new JSONObject(doc.toJson());
 
                 if (object.getString("login").equals(login) && object.getString("token").equals(token)) {
-                    System.out.println("login from object " + object.getString("login"));
                     return true;
                 }
             }
@@ -229,64 +148,27 @@ public class Database {
 
 
     public void updatePassword(String login, String hash) {
-        // crete new document
-
         Bson updateQuery = new Document("login", login);
         Bson newValue = new Document("password", hash);
         Bson update = new Document("$set", newValue);
         collectionUsers.updateOne(updateQuery, update);
-
     }
 
     public void deleteUser(String login, String token) throws JSONException {
-
-
         for (Document document : collectionUsers.find()) {
-            JSONObject object = new JSONObject(document.toJson());  // document to json
+            JSONObject object = new JSONObject(document.toJson());
 
-            // if equals login and token we can delete
-            if (object.getString("login").equals(login) &&
-                    object.getString("token").equals(token)) {
-
-                System.out.println(object);
+            if (object.getString("login").equals(login) && object.getString("token").equals(token)) {
 
                 BasicDBObject deleteQuery = new BasicDBObject();
                 deleteQuery.put("login", login);
                 collectionUsers.deleteOne(deleteQuery);
-                System.out.println("user delete  ");
-
-            } else {
-
-                System.out.println("nesplnena podmienka pre vymazanie ");
-            }
-        }
-
-
-    }
-
-    public void deleteUser(String login) throws JSONException {
-        BasicDBObject theQuery = new BasicDBObject();
-        theQuery.put("login", login);
-        collectionUsers.deleteOne(theQuery);
-
-        try (MongoCursor<Document> cursor = collectionMessages.find().iterator()) {
-            while (cursor.hasNext()) {
-                Document doc = cursor.next();
-                JSONObject object = new JSONObject(doc.toJson());
-                if (object.getString("from").equals(login)) {
-                    theQuery = new BasicDBObject();
-                    theQuery.put("from", login);
-                    collectionMessages.deleteOne(theQuery);
-                }
             }
         }
     }
 
     public boolean deleteMessage(String time, String message, String login) {
         BasicDBObject theQuery;
-        System.out.println(time);
-        System.out.println(message);
-        System.out.println(login);
 
         try (MongoCursor<Document> cursor = collectionMessages.find().iterator()) {
             while (cursor.hasNext()) {
@@ -306,12 +188,7 @@ public class Database {
     }
 
     public void updateUser(String fname, String lname, String login) {
-        // crete new document
-
-        System.out.println("string fname is " + fname + " lname is " + lname);
-
-        Bson filter = new Document("login", login) // na zaklade login
-                ;
+        Bson filter = new Document("login", login);
         Bson newValue = new Document("fname", fname).append("lname", lname);
 
         Bson updateOperationDocument = new Document("$set", newValue);
